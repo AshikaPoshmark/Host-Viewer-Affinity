@@ -159,6 +159,49 @@ GRANT ALL ON analytics_scratch.ashika_host_overall_stat TO PUBLIC;
 
 -------------------------------------------------------------------------------------  Feb 2025 stats of the hosts -------------------------------------------------------------------------
 
+------------- Feb 2025 - show viewer details -------------------------
+
+
+DROP TABLE IF EXISTS analytics_scratch.ashika_show_viewers_affinity_feb;
+CREATE TABLE analytics_scratch.ashika_show_viewers_affinity_feb AS
+select start_at,
+       (TO_CHAR(DATE(DATEADD(day,(0 - EXTRACT(DOW FROM dw_shows.start_at )::integer), dw_shows.start_at  )), 'YYYY-MM-DD')) AS show_start_week,
+       dw_shows.show_id,
+       creator_id,
+       live_show_host_activated_at,
+       show_host_activated_at,
+       dw_shows.origin_domain,
+       title,
+       type,
+       CASE WHEN dw_shows.type = 'silent' OR dw_shows.title ILIKE '%silent%' THEN 'Yes' ELSE 'No' END AS Is_silent_show,
+       unique_viewers,
+       viewer_id,
+       viewer_details.show_viewer_activated_at,
+    CASE WHEN show_viewer_events.viewer_id != show_viewer_events.host_id
+    and (host_follow_clicks > 0
+    OR sent_show_comments_clicks > 0
+    OR sent_show_reactions_clicks > 0
+    OR show_listing_likes_clicks > 0
+    OR show_bid_clicks > 0
+    OR show_listing_detail_clicks > 0
+    OR show_host_closet_clicks > 0
+    OR  show_viewer_events.show_giveaways_entered_clicks   > 0
+    OR total_watched_show_minutes >= 1)
+    THEN 'Yes' ELSE 'No' END AS is_engaged_viewer,
+    rank() over (partition by viewer_id,creator_id order by start_at ) as no_of_shows_viewed
+
+from analytics.dw_shows
+left join analytics.dw_shows_cs on dw_shows.show_id = dw_shows_cs.show_id
+left join analytics.dw_show_viewer_events_cs as show_viewer_events on dw_shows.show_id = show_viewer_events.show_id
+left join analytics.dw_users_cs on dw_users_cs.user_id = dw_shows.creator_id
+left join (select distinct user_id, show_viewer_activated_at from analytics.dw_users_cs) as viewer_details on viewer_details.user_id = show_viewer_events.viewer_id
+where start_at IS NOT NULL AND live_show_host_activated_at is not null
+AND origin_domain = 'us' AND (CASE WHEN dw_shows.type = 'silent' OR dw_shows.title ILIKE '%silent%' THEN 'Yes' ELSE 'No' END) = 'No'
+AND (DATE(dw_shows.start_at) >= '2025-02-01' AND DATE(dw_shows.start_at) < '2025-03-01')
+       group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+GRANT ALL ON analytics_scratch.ashika_show_viewers_affinity_feb TO PUBLIC;
+
+
 
 -------------- Feb 2025 - host level - viewer details -----------------
 
